@@ -15,5 +15,4 @@ import lombok.experimental.FieldDefaults;
 public class UsersResponse {
     String username;
     String email;
-    String password;
 }

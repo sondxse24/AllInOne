@@ -8,4 +8,6 @@ public interface UsersService {
     UsersResponse createUser(CreateUsersRequest users);
 
     UsersResponse findUserByNumericalOrder(long numerical_order);
+
+    UsersResponse getMe();
 }

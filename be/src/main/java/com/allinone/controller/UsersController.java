@@ -44,4 +44,15 @@ public class UsersController {
                         .build()
         );
     }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UsersResponse>> getCurrentUser() {
+        return ResponseEntity.ok(
+                ApiResponse.<UsersResponse>builder()
+                        .code(200)
+                        .message("Get my info successfully")
+                        .result(usersService.getMe())
+                        .build()
+        );
+    }
 }

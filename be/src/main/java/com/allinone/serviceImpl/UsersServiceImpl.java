@@ -10,6 +10,8 @@ import com.allinone.service.UsersService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -45,5 +47,15 @@ public class UsersServiceImpl implements UsersService {
     public UsersResponse findUserByNumericalOrder(long numerical_order) {
         Users user = usersRepository.findUsersByNumericalOrder(numerical_order);
         return usersMapper.toUsersResponse(user);
+    }
+
+    @Override
+    public UsersResponse getMe() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        assert authentication != null;
+        Users users = usersRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return usersMapper.toUsersResponse(users);
     }
 }

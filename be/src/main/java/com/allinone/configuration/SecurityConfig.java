@@ -1,5 +1,6 @@
 package com.allinone.configuration;
 
+import com.allinone.security.CsrfFilter;
 import com.allinone.security.JwtAuthenticationFilter;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -25,22 +31,26 @@ public class SecurityConfig {
     static final String[] PUBLIC_ENDPOINT = {
             "/api/auth/login",
             "/api/auth/refresh",
-            "/api/users/create",
+            "/api/users/create"
     };
 
     JwtAuthenticationFilter jwtAuthenticationFilter;
+    CsrfFilter csrfFilter;
 
     @Bean
-    public SecurityFilterChain appSecurityFilterChain(HttpSecurity http) {
+    public SecurityFilterChain appSecurityFilterChain(HttpSecurity http) throws Exception {
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> {
+                })
                 .authorizeHttpRequests(
                         auth -> auth
                                 .requestMatchers(PUBLIC_ENDPOINT).permitAll()
                                 .anyRequest()
                                 .authenticated())
+                .addFilterBefore(csrfFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
@@ -50,7 +60,26 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+
+        CorsConfiguration config = new CorsConfiguration();
+
+        config.setAllowedOrigins(List.of("http://localhost:5173"));
+
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+
+        config.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
+
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
