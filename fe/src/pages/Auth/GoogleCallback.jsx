@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react'; // Nhớ import useRef
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { message, Spin } from 'antd';
-import { loginGoogle } from '../../services/auth'; // Hoặc auth-google tùy file bạn đặt
+import React, { useEffect, useRef } from "react"; // Nhớ import useRef
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { message, Spin } from "antd";
+import { loginGoogle } from "../../services/auth"; // Hoặc auth-google tùy file bạn đặt
 
 const GoogleCallback = () => {
   const [searchParams] = useSearchParams();
@@ -9,22 +9,30 @@ const GoogleCallback = () => {
   const called = useRef(false); // 🛑 Biến cờ để chặn gọi 2 lần
 
   useEffect(() => {
-    const code = searchParams.get('code');
-    
+    const code = searchParams.get("code");
+
     // Chỉ chạy nếu có code VÀ chưa gọi lần nào
     if (code && !called.current) {
-        called.current = true; // Đánh dấu là đã gọi
-        
-        loginGoogle(code)
-            .then(() => {
-                message.success('Đăng nhập Google thành công!');
-                navigate('/dashboard');
-            })
-            .catch((err) => {
-                console.error(err);
-                message.error('Lỗi đăng nhập!');
-                navigate('/login');
-            });
+      called.current = true; // Đánh dấu là đã gọi
+
+      loginGoogle(code)
+        .then(() => {
+          message.success("Đăng nhập Google thành công!");
+          navigate("/dashboard");
+        })
+        .catch((err) => {
+          console.error(err);
+          message.error("Lỗi đăng nhập!");
+          navigate("/login");
+        });
+
+      loginGoogle(code).then(() => {
+        message.success("Thành công");
+        // Lấy link cũ ra
+        const redirectUrl = localStorage.getItem("redirectAfterLogin") || "/dashboard";
+        localStorage.removeItem("redirectAfterLogin"); // Xóa đi cho sạch
+        navigate(redirectUrl); // Chuyển về đúng chỗ cũ
+      });
     }
   }, []);
 

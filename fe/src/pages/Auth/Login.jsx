@@ -52,8 +52,13 @@ const AuthPage = () => {
   };
 
   const handleGoogleRedirect = () => {
-    const CLIENT_ID = "610368396745-a1skpehi101h4aeecvgf9r6ok2jsv284.apps.googleusercontent.com";
-    const REDIRECT_URI = "http://localhost:5173/oauth2/callback";
+    const currentPath = window.location.pathname;
+    if (currentPath !== "/login" && currentPath !== "/register") {
+      localStorage.setItem("redirectAfterLogin", currentPath);
+    }
+    
+    const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
 
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=email%20profile&access_type=offline&prompt=consent`;
 

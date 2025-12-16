@@ -17,6 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -25,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -53,17 +55,27 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public LoginResponse loginWithGoogle(String email, String name, String avatar) {
+    @Transactional
+    public LoginResponse loginWithGoogle(String email, String name) {
         Users user = usersRepository.findByEmail(email).orElse(null);
 
         if (user == null) {
             user = new Users();
             user.setEmail(email);
             user.setUsername(name);
-            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
             user.setRole(Role.MEMBER);
-            usersRepository.save(user);
+            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+
+            try {
+                usersRepository.save(user);
+            } catch (DataIntegrityViolationException e) {
+                user = usersRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("User not found after race condition"));
+            }
+        } else {
+            user.setUsername(name);
         }
+        usersRepository.save(user);
 
         CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(email);
 
@@ -71,6 +83,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public LoginResponse refresh(HttpServletRequest request) {
         String refreshToken = extractCookie(request, "refresh_token");
         if (refreshToken == null) throw new RuntimeException("Refresh token not found");
@@ -93,12 +106,28 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public void logout(HttpServletRequest request) {
         String accessToken = extractCookie(request, "access_token");
-        if (accessToken == null) return;
-        Jwt jwt = jwtDecoder.decode(accessToken);
-        String email = jwt.getSubject();
-        refreshTokenRepository.deleteByEmail(email);
+        System.out.println("   -> Service: Found Access Token string? " + (accessToken != null));
+
+        if (accessToken == null) {
+            System.out.println("   -> Service: Token is NULL, nothing to delete.");
+            return;
+        }
+
+        try {
+            Jwt jwt = jwtDecoder.decode(accessToken);
+            String email = jwt.getSubject();
+            System.out.println("   -> Service: Decoded Email: " + email);
+
+            refreshTokenRepository.deleteByEmail(email);
+            System.out.println("   -> Service: Deleted from DB successfully.");
+
+        } catch (Exception e) {
+            System.err.println("   -> Service: FAILED to decode/delete. Reason: " + e.getMessage());
+            throw e; // Ném lỗi ra để Controller bắt được
+        }
     }
 
     private LoginResponse generateAndSaveTokens(CustomUserDetails user) {

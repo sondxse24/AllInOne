@@ -14,7 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -25,6 +25,7 @@ public class UsersServiceImpl implements UsersService {
     UsersMapper usersMapper;
     PasswordEncoder passwordEncoder;
 
+    @Transactional
     public UsersResponse createUser(CreateUsersRequest createUser) {
 
         Role role = Role.MEMBER;
@@ -44,12 +45,14 @@ public class UsersServiceImpl implements UsersService {
     }
 
     @Override
+    @Transactional
     public UsersResponse findUserByNumericalOrder(long numerical_order) {
         Users user = usersRepository.findUsersByNumericalOrder(numerical_order);
         return usersMapper.toUsersResponse(user);
     }
 
     @Override
+    @Transactional
     public UsersResponse getMe() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         assert authentication != null;

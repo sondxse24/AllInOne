@@ -6,20 +6,20 @@ import com.allinone.service.AuthGoogleService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import lombok.extern.slf4j.Slf4j; // 1. Thêm cái này để log cho đẹp
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException; // 2. Import Exception này
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-@Slf4j // 3. Annotation tạo logger
+@Slf4j
 public class AuthGoogleServiceImpl implements AuthGoogleService {
 
     WebClient webClient = WebClient.create();
@@ -27,8 +27,6 @@ public class AuthGoogleServiceImpl implements AuthGoogleService {
 
     @Override
     public LoginGoogleResponse authenticate(String code) {
-        // Log xem Code nhận được là gì
-        log.info("START AUTHENTICATE GOOGLE with CODE: {}", code);
 
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("code", code);
@@ -51,6 +49,7 @@ public class AuthGoogleServiceImpl implements AuthGoogleService {
                     .bodyToMono(Map.class)
                     .block();
 
+            assert response != null;
             String accessToken = (String) response.get("access_token");
             log.info("Get Access Token Success: {}", accessToken != null ? "YES" : "NO");
 
@@ -62,12 +61,9 @@ public class AuthGoogleServiceImpl implements AuthGoogleService {
                     .block();
 
         } catch (WebClientResponseException e) {
-            // 🛑 BẮT LỖI TẠI ĐÂY 🛑
-            // Nó sẽ in ra chi tiết Google trả về cái gì (JSON lỗi)
             log.error("GOOGLE ERROR STATUS: {}", e.getStatusCode());
             log.error("GOOGLE ERROR BODY: {}", e.getResponseBodyAsString());
-
-            throw e; // Ném lỗi tiếp để Controller xử lý sau
+            throw e;
         } catch (Exception ex) {
             log.error("UNKNOWN ERROR: ", ex);
             throw new RuntimeException(ex);
