@@ -13,24 +13,29 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // --- DEBUG LOG (Xem nó in ra số mấy) ---
-    console.log("❌ Lỗi API:", error.response?.status, error.config.url);
+    // 🛑 QUAN TRỌNG: CHẶN ĐỨNG SPAM
+    // Nếu cái API đang bị lỗi chính là '/auth/refresh' -> Thì có nghĩa là hết cứu -> Logout luôn
+    if (originalRequest.url && originalRequest.url.includes('/auth/refresh')) {
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+        return Promise.reject(error);
+    }
 
-    // Sửa điều kiện: Bắt cả 401 VÀ 403
     if (
       (error.response?.status === 401 || error.response?.status === 403) && 
       !originalRequest._retry
     ) {
-      console.log("--> Phát hiện lỗi Auth, đang thử Refresh..."); // Nếu thấy dòng này là ngon
       originalRequest._retry = true;
 
       try {
+        // Gọi API làm mới token
         await api.post("/auth/refresh");
-        console.log("--> Refresh thành công! Gọi lại API cũ...");
+        
+        // Refresh thành công -> Gọi lại request cũ
         return api(originalRequest);
         
       } catch (refreshError) {
-        console.error("--> Refresh thất bại:", refreshError);
+        // Refresh thất bại -> Logout
         localStorage.removeItem("user");
         window.location.href = "/login";
         return Promise.reject(refreshError);

@@ -1,9 +1,12 @@
 package com.allinone.serviceImpl;
 
+import com.allinone.constrant.Role;
 import com.allinone.dto.request.auth.LoginRequest;
 import com.allinone.dto.response.auth.LoginResponse;
 import com.allinone.entity.RefreshToken;
+import com.allinone.entity.Users;
 import com.allinone.repository.RefreshTokenRepository;
+import com.allinone.repository.UsersRepository;
 import com.allinone.security.CustomUserDetails;
 import com.allinone.security.CustomUserDetailsService;
 import com.allinone.security.JwtService;
@@ -14,14 +17,18 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -33,29 +40,75 @@ public class AuthServiceImpl implements AuthService {
     JwtDecoder jwtDecoder;
     CustomUserDetailsService userDetailsService;
     RefreshTokenRepository refreshTokenRepository;
+    UsersRepository usersRepository;
+    PasswordEncoder passwordEncoder;
 
     @Override
     public LoginResponse login(LoginRequest request) {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return generateAndSaveTokens(user);
+    }
 
-        Authentication authentication =
-                authenticationManager.authenticate(
-                        new UsernamePasswordAuthenticationToken(
-                                request.getEmail(),
-                                request.getPassword()
-                        )
-                );
+    @Override
+    public LoginResponse loginWithGoogle(String email, String name, String avatar) {
+        Users user = usersRepository.findByEmail(email).orElse(null);
 
-        CustomUserDetails user =
-                (CustomUserDetails) authentication.getPrincipal();
+        if (user == null) {
+            user = new Users();
+            user.setEmail(email);
+            user.setUsername(name);
+            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+            user.setRole(Role.MEMBER);
+            usersRepository.save(user);
+        }
 
+        CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(email);
+
+        return generateAndSaveTokens(userDetails);
+    }
+
+    @Override
+    public LoginResponse refresh(HttpServletRequest request) {
+        String refreshToken = extractCookie(request, "refresh_token");
+        if (refreshToken == null) throw new RuntimeException("Refresh token not found");
+
+        String hash = Hash.hashToken(refreshToken);
+        RefreshToken stored = refreshTokenRepository
+                .findByTokenHashAndRevokedFalse(hash)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Refresh token has been revoked"));
+
+        Jwt jwt = jwtDecoder.decode(refreshToken);
+        if (!"refresh".equals(jwt.getClaim("type"))) throw new RuntimeException("Invalid token type");
+
+        String email = jwt.getClaim("email");
+
+        stored.setRevoked(true);
+        refreshTokenRepository.save(stored);
+
+        CustomUserDetails user = (CustomUserDetails) userDetailsService.loadUserByUsername(email);
+        return generateAndSaveTokens(user);
+    }
+
+    @Override
+    public void logout(HttpServletRequest request) {
+        String accessToken = extractCookie(request, "access_token");
+        if (accessToken == null) return;
+        Jwt jwt = jwtDecoder.decode(accessToken);
+        String email = jwt.getSubject();
+        refreshTokenRepository.deleteByEmail(email);
+    }
+
+    private LoginResponse generateAndSaveTokens(CustomUserDetails user) {
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
         RefreshToken entity = new RefreshToken();
         entity.setTokenHash(Hash.hashToken(refreshToken));
-        assert user != null;
         entity.setEmail(user.getUsername());
-        entity.setExpiresAt(Instant.now().plusSeconds(7 * 24 * 60 * 60));
+        entity.setExpiresAt(Instant.now().plusSeconds(7 * 24 * 60 * 60)); // 7 ngày
         entity.setRevoked(false);
 
         refreshTokenRepository.save(entity);
@@ -63,71 +116,10 @@ public class AuthServiceImpl implements AuthService {
         return new LoginResponse(accessToken, refreshToken);
     }
 
-    @Override
-    public LoginResponse refresh(HttpServletRequest request) {
-
-        String refreshToken = extractCookie(request, "refresh_token");
-        if (refreshToken == null) {
-            throw new RuntimeException("Refresh token not found");
-        }
-
-        String hash = Hash.hashToken(refreshToken);
-
-        RefreshToken stored = refreshTokenRepository
-                .findByTokenHashAndRevokedFalse(hash)
-                .orElseThrow(() -> new RuntimeException("Refresh token revoked"));
-
-        Jwt jwt = jwtDecoder.decode(refreshToken);
-
-        if (!"refresh".equals(jwt.getClaim("type"))) {
-            throw new RuntimeException("Invalid token type");
-        }
-
-        String email = jwt.getClaim("email");
-
-        stored.setRevoked(true);
-        refreshTokenRepository.save(stored);
-
-        CustomUserDetails user =
-                (CustomUserDetails) userDetailsService
-                        .loadUserByUsername(email);
-
-        String newAccessToken = jwtService.generateAccessToken(user);
-        String newRefreshToken = jwtService.generateRefreshToken(user);
-
-        RefreshToken newEntity = new RefreshToken();
-        newEntity.setTokenHash(Hash.hashToken(newRefreshToken));
-        newEntity.setEmail(email);
-        newEntity.setExpiresAt(Instant.now().plusSeconds(7 * 24 * 60 * 60));
-        newEntity.setRevoked(false);
-
-        refreshTokenRepository.save(newEntity);
-
-        return new LoginResponse(newAccessToken, newRefreshToken);
-    }
-
-    @Override
-    public void logout(HttpServletRequest request) {
-
-        String accessToken = extractCookie(request, "access_token");
-        if (accessToken == null) return;
-
-        Jwt jwt = jwtDecoder.decode(accessToken);
-        String email = jwt.getSubject();
-
-        refreshTokenRepository.deleteByEmail(email);
-    }
-
-    private String extractCookie(
-            HttpServletRequest request,
-            String name
-    ) {
+    private String extractCookie(HttpServletRequest request, String name) {
         if (request.getCookies() == null) return null;
-
         for (Cookie cookie : request.getCookies()) {
-            if (name.equals(cookie.getName())) {
-                return cookie.getValue();
-            }
+            if (name.equals(cookie.getName())) return cookie.getValue();
         }
         return null;
     }

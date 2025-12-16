@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/default/Login";
-import Dashboard from "./pages/default/Dashboard";
+import Login from "./pages/Auth/Login";
+import Dashboard from "./pages/Dashboard";
+import GoogleCallback from "./pages/Auth/GoogleCallback";
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
 
         <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/oauth2/callback" element={<GoogleCallback />} />
       </Routes>
     </BrowserRouter>
   );

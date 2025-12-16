@@ -30,15 +30,16 @@ public class SecurityConfig {
 
     static final String[] PUBLIC_ENDPOINT = {
             "/api/auth/login",
+            "/api/auth/google",
             "/api/auth/refresh",
-            "/api/users/create"
+            "/api/users/create",
     };
 
     JwtAuthenticationFilter jwtAuthenticationFilter;
     CsrfFilter csrfFilter;
 
     @Bean
-    public SecurityFilterChain appSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain appSecurityFilterChain(HttpSecurity http) {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -60,7 +61,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) {
         return config.getAuthenticationManager();
     }
 

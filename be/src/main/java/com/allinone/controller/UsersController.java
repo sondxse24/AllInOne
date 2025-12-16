@@ -22,7 +22,7 @@ public class UsersController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<ApiResponse<UsersResponse>> createUser(@RequestBody CreateUsersRequest user) {
+    public ResponseEntity<ApiResponse<?>> createUser(@RequestBody CreateUsersRequest user) {
         UsersResponse users = usersService.createUser(user);
         return ResponseEntity.ok(
                 ApiResponse.<UsersResponse>builder()
@@ -34,7 +34,7 @@ public class UsersController {
     }
 
     @GetMapping("/no")
-    public ResponseEntity<ApiResponse<UsersResponse>> noUser(@RequestParam int no) {
+    public ResponseEntity<ApiResponse<?>> noUser(@RequestParam int no) {
         UsersResponse users = usersService.findUserByNumericalOrder(no);
         return ResponseEntity.ok(
                 ApiResponse.<UsersResponse>builder()
@@ -46,7 +46,7 @@ public class UsersController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UsersResponse>> getCurrentUser() {
+    public ResponseEntity<ApiResponse<?>> getCurrentUser() {
         return ResponseEntity.ok(
                 ApiResponse.<UsersResponse>builder()
                         .code(200)
