@@ -4,11 +4,11 @@ import com.allinone.constrant.AuthProvider;
 import com.allinone.constrant.Role;
 import com.allinone.dto.request.users.CreateUsersRequest;
 import com.allinone.dto.response.users.UsersResponse;
-import com.allinone.entity.Users;
+import com.allinone.entity.iam.Users;
 import com.allinone.exception.AppException;
 import com.allinone.exception.ErrorCode;
 import com.allinone.mapper.UsersMapper;
-import com.allinone.repository.UsersRepository;
+import com.allinone.repository.iam.UsersRepository;
 import com.allinone.service.UsersService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -84,5 +84,10 @@ public class UsersServiceImpl implements UsersService {
     @Override
     public List<UsersResponse> getAllUsers() {
         return usersMapper.toUsersResponseList(usersRepository.findAll());
+    }
+
+    @Override
+    public Users findByEmail(String email) {
+        return usersRepository.findByEmail(email).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 }

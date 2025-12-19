@@ -5,12 +5,14 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
 @Component
+@Slf4j // Thêm log để debug dễ hơn
 public class CsrfFilter extends OncePerRequestFilter {
 
     @Override
@@ -25,11 +27,18 @@ public class CsrfFilter extends OncePerRequestFilter {
             return;
         }
 
-        String csrfHeader = request.getHeader("X-CSRF-TOKEN");
+        // 1. Sửa lại tên Header: Dùng X-XSRF-TOKEN (cho đúng chuẩn và khớp axios)
+        // Hoặc X-CSRF-TOKEN tùy bạn, nhưng phải khớp tuyệt đối giữa Postman/FE và BE
+        String csrfHeader = request.getHeader("X-XSRF-TOKEN");
         String csrfCookie = getCookie(request, "XSRF-TOKEN");
 
-        if (csrfHeader == null || !csrfHeader.equals(csrfCookie)) {
+        log.info("CSRF Check - Header: {}, Cookie: {}", csrfHeader, csrfCookie);
+
+        // 2. Kiểm tra Null và So sánh
+        if (csrfHeader == null || csrfCookie == null || !csrfHeader.equals(csrfCookie)) {
+            log.warn("CSRF Validation Failed for path: {}", request.getServletPath());
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.getWriter().write("CSRF Token Mismatch or Missing");
             return;
         }
 
@@ -38,14 +47,15 @@ public class CsrfFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-
         String path = request.getServletPath();
+        String userAgent = request.getHeader("User-Agent");
+
+        // 3. Sửa lại check Postman: Postman gửi User-Agent chứa "PostmanRuntime/"
+        boolean isPostman = userAgent != null && userAgent.contains("PostmanRuntime");
 
         return path.startsWith("/api/auth/")
                 || path.equals("/api/users/create")
-                || "PostmanRuntime".equals(
-                request.getHeader("User-Agent")
-        );
+                || isPostman;
     }
 
     private boolean isSafeMethod(HttpServletRequest request) {
@@ -56,7 +66,6 @@ public class CsrfFilter extends OncePerRequestFilter {
 
     private String getCookie(HttpServletRequest request, String name) {
         if (request.getCookies() == null) return null;
-
         for (Cookie cookie : request.getCookies()) {
             if (name.equals(cookie.getName())) {
                 return cookie.getValue();

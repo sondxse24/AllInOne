@@ -9,6 +9,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(name = "chat_room")
 public class ChatRoom {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

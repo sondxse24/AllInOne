@@ -3,12 +3,11 @@ package com.allinone.controller;
 import com.allinone.dto.base.ApiResponse;
 import com.allinone.dto.request.users.CreateUsersRequest;
 import com.allinone.dto.response.users.UsersResponse;
-import com.allinone.entity.Users;
 import com.allinone.service.UsersService;
 import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,13 +15,10 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/users")
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@RequiredArgsConstructor
 public class UsersController {
 
     UsersService usersService;
-
-    public UsersController(UsersService usersService) {
-        this.usersService = usersService;
-    }
 
     @PostMapping("/create")
     public ResponseEntity<ApiResponse<?>> createUser(@RequestBody CreateUsersRequest user) {

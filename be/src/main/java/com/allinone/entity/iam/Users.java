@@ -1,4 +1,4 @@
-package com.allinone.entity;
+package com.allinone.entity.iam;
 
 import com.allinone.constrant.AuthProvider;
 import com.allinone.constrant.Role;

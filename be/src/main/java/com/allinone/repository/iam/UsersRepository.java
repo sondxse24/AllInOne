@@ -1,6 +1,6 @@
-package com.allinone.repository;
+package com.allinone.repository.iam;
 
-import com.allinone.entity.Users;
+import com.allinone.entity.iam.Users;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

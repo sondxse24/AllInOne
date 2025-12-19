@@ -1,5 +1,6 @@
 package com.allinone.entity.chat;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -9,6 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(name = "chat_message")
 public class ChatMessage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,5 +25,6 @@ public class ChatMessage {
 
     @ManyToOne
     @JoinColumn(name = "chat_room_id")
+    @JsonIgnore
     private ChatRoom chatRoom;
 }
