@@ -8,7 +8,10 @@ import com.allinone.service.UsersService;
 import lombok.AccessLevel;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -52,6 +55,17 @@ public class UsersController {
                         .code(200)
                         .message("Get my info successfully")
                         .result(usersService.getMe())
+                        .build()
+        );
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<ApiResponse<?>> getAllUsers() {
+        return ResponseEntity.ok(
+                ApiResponse.<List<UsersResponse>>builder()
+                        .code(200)
+                        .message("Get my info successfully")
+                        .result(usersService.getAllUsers())
                         .build()
         );
     }

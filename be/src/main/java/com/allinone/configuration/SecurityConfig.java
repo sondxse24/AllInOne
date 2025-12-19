@@ -34,6 +34,8 @@ public class SecurityConfig {
             "/api/auth/refresh",
             "/api/auth/logout",
             "/api/users/create",
+            "/api/chat/create",
+            "/ws/**",
     };
 
     JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -75,7 +77,7 @@ public class SecurityConfig {
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        config.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
+        config.setAllowedHeaders(List.of("*"));
 
         config.setAllowCredentials(true);
 

@@ -52,7 +52,8 @@ public class AuthController {
 
         LoginResponse tokens = authService.loginWithGoogle(
                 googleInfo.getEmail(),
-                googleInfo.getName()
+                googleInfo.getName(),
+                googleInfo.getPicture()
         );
 
         setCookies(response, tokens);
@@ -73,24 +74,15 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<?>> logout(HttpServletRequest request, HttpServletResponse response) {
-        System.out.println("============== START LOGOUT REQUEST =============="); // 1. Báo hiệu bắt đầu
 
         try {
-            System.out.println("1. Calling authService.logout()...");
             authService.logout(request);
-            System.out.println("2. authService.logout() SUCCESS.");
         } catch (Exception e) {
-            // Log lỗi nếu Service bị chết giữa đường
-            System.err.println("!!! ERROR in authService.logout(): " + e.getMessage());
             e.printStackTrace();
-            // Quan trọng: Nếu muốn debug, tạm thời không throw lỗi để code chạy tiếp xuống dưới
         }
 
-        System.out.println("3. Calling clearCookies()...");
         clearCookies(response);
-        System.out.println("4. clearCookies() FINISHED.");
 
-        System.out.println("============== END LOGOUT REQUEST ==============");
         return ResponseEntity.ok(ApiResponse.<Void>builder().code(200).message("Logout successfully").build());
     }
 
@@ -124,7 +116,6 @@ public class AuthController {
     }
 
     private void clearCookies(HttpServletResponse response) {
-        // Log xem cookie được tạo ra như thế nào
         ResponseCookie accessCookie = ResponseCookie.from("access_token", "")
                 .path("/")
                 .maxAge(0)
@@ -135,10 +126,7 @@ public class AuthController {
                 .maxAge(0)
                 .build();
 
-        System.out.println(">> Setting Header Set-Cookie: " + accessCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
-
-        System.out.println(">> Setting Header Set-Cookie: " + refreshCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
     }
 }

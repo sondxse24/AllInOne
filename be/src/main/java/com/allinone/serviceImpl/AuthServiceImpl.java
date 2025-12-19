@@ -1,10 +1,13 @@
 package com.allinone.serviceImpl;
 
+import com.allinone.constrant.AuthProvider;
 import com.allinone.constrant.Role;
 import com.allinone.dto.request.auth.LoginRequest;
 import com.allinone.dto.response.auth.LoginResponse;
 import com.allinone.entity.RefreshToken;
 import com.allinone.entity.Users;
+import com.allinone.exception.AppException;
+import com.allinone.exception.ErrorCode;
 import com.allinone.repository.RefreshTokenRepository;
 import com.allinone.repository.UsersRepository;
 import com.allinone.security.CustomUserDetails;
@@ -18,8 +21,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,7 +30,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -47,35 +49,43 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
-        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
-        return generateAndSaveTokens(user);
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+            CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+            return generateAndSaveTokens(user);
+        } catch (BadCredentialsException e) {
+            throw new AppException(ErrorCode.LOGIN_FAILED);
+        }
     }
 
     @Override
     @Transactional
-    public LoginResponse loginWithGoogle(String email, String name) {
+    public LoginResponse loginWithGoogle(String email, String name, String avatar) {
         Users user = usersRepository.findByEmail(email).orElse(null);
 
         if (user == null) {
             user = new Users();
             user.setEmail(email);
             user.setUsername(name);
+            user.setAvatar(avatar);
+            user.setProvider(AuthProvider.GOOGLE);
             user.setRole(Role.MEMBER);
             user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+            user.setEnabled(true);
 
             try {
                 usersRepository.save(user);
             } catch (DataIntegrityViolationException e) {
                 user = usersRepository.findByEmail(email)
-                        .orElseThrow(() -> new RuntimeException("User not found after race condition"));
+                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
             }
         } else {
+            user.setAvatar(avatar);
             user.setUsername(name);
+            usersRepository.save(user);
         }
-        usersRepository.save(user);
 
         CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(email);
 
@@ -85,16 +95,21 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponse refresh(HttpServletRequest request) {
-        String refreshToken = extractCookie(request, "refresh_token");
-        if (refreshToken == null) throw new RuntimeException("Refresh token not found");
 
+        String refreshToken = extractCookie(request, "refresh_token");
+
+        if (refreshToken == null) {
+            throw new AppException(ErrorCode.REFRESH_TOKEN_NOT_FOUND);
+        }
         String hash = Hash.hashToken(refreshToken);
         RefreshToken stored = refreshTokenRepository
                 .findByTokenHashAndRevokedFalse(hash)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Refresh token has been revoked"));
+                .orElseThrow(() -> new AppException(ErrorCode.REFRESH_TOKEN_REVOKED));
 
         Jwt jwt = jwtDecoder.decode(refreshToken);
-        if (!"refresh".equals(jwt.getClaim("type"))) throw new RuntimeException("Invalid token type");
+        if (!"refresh".equals(jwt.getClaim("type"))) {
+            throw new AppException(ErrorCode.INVALID_TOKEN_TYPE);
+        }
 
         String email = jwt.getClaim("email");
 
@@ -108,26 +123,13 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void logout(HttpServletRequest request) {
+
         String accessToken = extractCookie(request, "access_token");
-        System.out.println("   -> Service: Found Access Token string? " + (accessToken != null));
+        if (accessToken == null) return;
 
-        if (accessToken == null) {
-            System.out.println("   -> Service: Token is NULL, nothing to delete.");
-            return;
-        }
-
-        try {
-            Jwt jwt = jwtDecoder.decode(accessToken);
-            String email = jwt.getSubject();
-            System.out.println("   -> Service: Decoded Email: " + email);
-
-            refreshTokenRepository.deleteByEmail(email);
-            System.out.println("   -> Service: Deleted from DB successfully.");
-
-        } catch (Exception e) {
-            System.err.println("   -> Service: FAILED to decode/delete. Reason: " + e.getMessage());
-            throw e; // Ném lỗi ra để Controller bắt được
-        }
+        Jwt jwt = jwtDecoder.decode(accessToken);
+        String email = jwt.getSubject();
+        refreshTokenRepository.deleteByEmail(email);
     }
 
     private LoginResponse generateAndSaveTokens(CustomUserDetails user) {

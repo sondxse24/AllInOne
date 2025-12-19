@@ -1,35 +1,38 @@
-import { useEffect, useState } from "react";
-import api from "../config/axios";
 import MainLayout from "../layouts/MainLayout";
-import { Card, Descriptions, Spin, Tag } from "antd";
+import { Row, Col, Card, Statistic } from "antd";
+import {
+  MessageOutlined,
+  ArrowRightOutlined,
+} from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    api
-      .get("/users/me")
-      .then((res) => setUser(res.data.result || res.data))
-      .catch(() => setError("403 - Not authenticated"));
-  }, []);
+  const navigate = useNavigate();
 
   return (
     <MainLayout>
-      <h2>Dashboard</h2>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      {!user && !error ? <Spin tip="Loading..." /> : null}
-      {user && (
-        <Card title="Thông tin người dùng" bordered={false} style={{ maxWidth: 800 }}>
-          <Descriptions bordered column={1}>
-            <Descriptions.Item label="Username">{user.username}</Descriptions.Item>
-            <Descriptions.Item label="Email">{user.email}</Descriptions.Item>
-            <Descriptions.Item label="Role">
-              <Tag color="blue">{user.role}</Tag>
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
-      )}
+      <h2 style={{ marginBottom: 20 }}>Dashboard Tổng quan</h2>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={8}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Card
+              hoverable
+              variant="borderless"
+              onClick={() => navigate("/chat")}
+              style={{ cursor: "pointer", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: "white" }}>
+                <div>
+                  <MessageOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+                  <h3 style={{ color: "white", margin: 0 }}>Phòng Chat Nhóm</h3>
+                  <span style={{ opacity: 0.8 }}>Thảo luận & Trao đổi</span>
+                </div>
+                <ArrowRightOutlined style={{ fontSize: 20 }} />
+              </div>
+            </Card>
+          </div>
+        </Col>
+      </Row>
     </MainLayout>
   );
 }

@@ -16,5 +16,6 @@ public class CreateUsersRequest {
     String name;
     String email;
     String password;
+    String avatar;
     String role;
 }
