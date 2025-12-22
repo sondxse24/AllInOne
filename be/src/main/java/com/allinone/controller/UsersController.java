@@ -65,4 +65,15 @@ public class UsersController {
                         .build()
         );
     }
+
+    @GetMapping("/username")
+    public ResponseEntity<ApiResponse<?>> getUserByUsername(@RequestParam String username) {
+        return ResponseEntity.ok(
+                ApiResponse.<List<UsersResponse>>builder()
+                        .code(200)
+                        .message("Get my info successfully")
+                        .result(usersService.getAllUsersByName(username))
+                        .build()
+        );
+    }
 }

@@ -1,62 +1,119 @@
 import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "../layouts/MainLayout";
-import { List, Avatar, Input, Button, Modal, Form, Select, Typography, Spin, Empty } from "antd";
-import { SendOutlined, PlusOutlined, UsergroupAddOutlined } from "@ant-design/icons";
+import { Avatar, Input, Button, Modal, Form, Select, Typography, Empty, Badge, Spin } from "antd";
+import { SendOutlined, UsergroupAddOutlined, UserAddOutlined, BellOutlined } from "@ant-design/icons";
 import api from "../config/axios";
 import { useAuth } from "../context/AuthContext";
 import SockJS from "sockjs-client";
 import Stomp from "stompjs";
 import "./ChatPage.css";
 
+// Import các modal phụ (giữ nguyên nếu bạn đã có file)
+import AddFriendModal from "./Friend/AddFriendModal";
+import FriendRequestsModal from "./Friend/FriendRequestsModal";
+
 const { Text } = Typography;
 
 export default function ChatPage() {
-  const { user } = useAuth();
+  const { user } = useAuth(); // user cần chứa userId, email, username
 
-  // State quản lý dữ liệu
-  const [rooms, setRooms] = useState([]); // Danh sách phòng
-  const [selectedRoom, setSelectedRoom] = useState(null); // Phòng đang chọn
-  const [messages, setMessages] = useState([]); // Tin nhắn của phòng hiện tại
+  // --- STATE ---
+  const [rooms, setRooms] = useState([]);
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
 
-  // State cho Modal tạo nhóm
+  const [loadingMessages, setLoadingMessages] = useState(false);
+
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [allUsers, setAllUsers] = useState([]); // List user để chọn khi tạo nhóm
+  const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
+  const [isRequestsOpen, setIsRequestsOpen] = useState(false);
+
+  // Data State
+  const [friends, setFriends] = useState([]);
+  const [requestCount, setRequestCount] = useState(0);
+
   const [form] = Form.useForm();
 
-  // Ref WebSocket
+  // Refs
   const stompClientRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const subscriptionRef = useRef(null); // Để lưu subscription hiện tại (để unsubscribe khi đổi phòng)
+  const subscriptionRef = useRef(null);
 
-  // 1. Load danh sách phòng khi vào trang
+  // --- EFFECTS ---
+
+  // 1. Init: Lấy phòng, bạn bè, connect socket
   useEffect(() => {
     fetchRooms();
+    fetchRequestCount();
     connectWebSocket();
-
     return () => disconnectWebSocket();
   }, []);
 
-  // 2. Tự động cuộn xuống khi có tin nhắn mới
+  // 2. Scroll xuống cuối khi có tin nhắn mới
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // 3. Khi đổi phòng: Load lịch sử & Subscribe topic mới
+  // 3. Khi chọn phòng: Lấy lịch sử tin nhắn & Subscribe socket topic
   useEffect(() => {
-    if (selectedRoom) {
-      fetchHistory(selectedRoom.id);
-      subscribeToRoom(selectedRoom.id);
-    }
+    if (!selectedRoom) return;
+
+    // Biến cờ: Đánh dấu đây là phòng hiện tại
+    let isCurrentRoom = true;
+
+    const loadRoomData = async () => {
+      try {
+        setLoadingMessages(true);
+        // Reset tin nhắn ngay lập tức để không hiện tin nhắn của phòng cũ
+        setMessages([]);
+
+        // Gọi API lấy lịch sử
+        const res = await api.get(`/chat/messages/${selectedRoom.id}`);
+
+        // QUAN TRỌNG: Chỉ set data nếu user VẪN ĐANG ở phòng này
+        // Nếu user đã switch sang phòng khác trong lúc chờ API, isCurrentRoom sẽ là false
+        if (isCurrentRoom) {
+          setMessages(res.data.result || []);
+        }
+      } catch (error) {
+        console.error("Lỗi lấy lịch sử tin nhắn", error);
+      } finally {
+        if (isCurrentRoom) setLoadingMessages(false);
+      }
+    };
+
+    // Thực thi load data
+    loadRoomData();
+
+    // Subscribe socket cho phòng mới
+    subscribeToRoom(selectedRoom.id);
+
+    // CLEANUP FUNCTION: Chạy khi user đổi sang phòng khác hoặc unmount
+    return () => {
+      isCurrentRoom = false; // Hủy cờ của phòng cũ
+    };
   }, [selectedRoom]);
 
-  // --- CÁC HÀM API ---
+  // --- API CALLS ---
+
   const fetchRooms = async () => {
     try {
       const res = await api.get("/chat/my-rooms");
+      // Backend trả về List<ChatRoomResponse>
       setRooms(res.data.result);
     } catch (error) {
       console.error("Lỗi lấy danh sách phòng", error);
+    }
+  };
+
+  const fetchFriends = async () => {
+    try {
+      const res = await api.get("/friend/list");
+      setFriends(res.data.result);
+    } catch (e) {
+      console.log("Lỗi lấy danh sách bạn bè", e);
     }
   };
 
@@ -69,103 +126,134 @@ export default function ChatPage() {
     }
   };
 
-  const fetchAllUsers = async () => {
-    // Hàm này gọi API lấy danh sách toàn bộ user để add vào nhóm
-    // Giả sử bạn có API /users
+  const fetchRequestCount = async () => {
     try {
-      const res = await api.get("/users/all");
-      // Filter bỏ bản thân mình ra
-      const otherUsers = res.data.result.filter((u) => u.username !== user.username);
-      setAllUsers(otherUsers);
+      const res = await api.get("/friend/requests");
+      setRequestCount(res.data.result?.length || 0);
     } catch (e) {
-      console.log(e);
+      console.error("Lỗi đếm lời mời", e);
     }
   };
 
+  // --- LOGIC XỬ LÝ (QUAN TRỌNG) ---
+
+  // Helper: Tìm người đối diện trong chat 1-1 để lấy tên/avatar
+  const getPartnerInfo = (room) => {
+    if (!room.participants || room.participants.length === 0) return null;
+    // Tìm người có userId KHÁC với userId của mình
+    // Lưu ý ép kiểu String để so sánh chính xác
+    return room.participants.find((p) => String(p.userId) !== String(user.userId));
+  };
+
+  // Helper: Lấy tên hiển thị
+  const getDisplayName = (room) => {
+    if (room.isGroup) {
+      return room.name || "Nhóm không tên";
+    }
+    const partner = getPartnerInfo(room);
+    return partner ? partner.userName : "Người dùng hệ thống";
+  };
+
+  // Helper: Lấy Avatar hiển thị
+  const getDisplayAvatar = (room) => {
+    if (room.isGroup) return null; // Để null để Antd hiển thị mặc định hoặc icon nhóm
+    const partner = getPartnerInfo(room);
+    return partner ? partner.avatar : null;
+  };
+
+  // --- HANDLERS ---
+
   const handleCreateRoom = async (values) => {
     try {
-      console.log("Members selected:", values.members);
-      console.log("My email:", user?.email);
-
+      // Backend check: nếu list size > 2 -> isGroup = true
+      // values.members là mảng các email
       const payload = {
-        name: values.name,
-        // Đảm bảo không gửi null vào mảng
-        participantIds: [...(values.members || []), user.email].filter((item) => item !== null),
+        name: values.members.length > 1 ? values.name : null,
+        participantIds: [...(values.members || []), user.email],
       };
 
       await api.post("/chat/create", payload);
+
       setIsModalOpen(false);
       form.resetFields();
-      fetchRooms(); // Load lại danh sách
+      fetchRooms(); // Load lại list để thấy phòng mới
     } catch (error) {
       console.error("Lỗi tạo nhóm", error);
     }
   };
 
-  // --- CÁC HÀM WEBSOCKET ---
-  const connectWebSocket = () => {
-    const socket = new SockJS("http://localhost:8080/ws");
-    const client = Stomp.over(socket);
-    client.debug = null;
+  const handleSelectFriend = async (friend) => {
+    try {
+      const payload = {
+        name: null,
+        participantIds: [user.email, friend.email], // Gửi email để tìm user
+      };
 
-    client.connect(
-      {},
-      () => {
-        console.log("Connected to WebSocket");
-        stompClientRef.current = client;
-      },
-      (err) => {
-        console.error("WebSocket error", err);
-      }
-    );
-  };
+      const res = await api.post("/chat/create", payload);
+      const targetRoom = res.data.result;
 
-  const subscribeToRoom = (roomId) => {
-    if (!stompClientRef.current || !stompClientRef.current.connected) return;
+      // Refresh list và chọn phòng vừa tạo/tìm thấy
+      await fetchRooms();
+      setSelectedRoom(targetRoom);
 
-    // Nếu đã subscribe phòng khác rồi thì hủy đăng ký cũ đi
-    if (subscriptionRef.current) {
-      subscriptionRef.current.unsubscribe();
+      // Đóng modal friend list nếu đang mở (nếu bạn dùng logic đó)
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Lỗi khi mở chat với bạn bè", error);
     }
-
-    // Đăng ký kênh mới: /topic/room/{roomId}
-    subscriptionRef.current = stompClientRef.current.subscribe(`/topic/room/${roomId}`, (payload) => {
-      const newMessage = JSON.parse(payload.body);
-      setMessages((prev) => [...prev, newMessage]);
-    });
   };
 
   const sendMessage = () => {
     if (inputMessage.trim() && stompClientRef.current && selectedRoom) {
       const chatMessage = {
         content: inputMessage,
-        senderId: user.username, // Hoặc ID tùy backend
+        senderId: user.userId, // Hoặc user.userId tùy backend lưu gì
       };
-
-      // Gửi tới: /app/chat/{roomId}
       stompClientRef.current.send(`/app/chat/${selectedRoom.id}`, {}, JSON.stringify(chatMessage));
       setInputMessage("");
     }
   };
 
-  const disconnectWebSocket = () => {
-    if (stompClientRef.current) {
-      stompClientRef.current.disconnect();
-    }
+  // --- WEBSOCKET ---
+
+  const connectWebSocket = () => {
+    const socket = new SockJS("http://localhost:8080/ws");
+    const client = Stomp.over(socket);
+    // client.debug = null; // Bật lại nếu muốn xem log socket
+    client.connect(
+      {},
+      () => {
+        stompClientRef.current = client;
+        // Nếu đang chọn phòng thì sub lại ngay
+        if (selectedRoom) subscribeToRoom(selectedRoom.id);
+      },
+      (err) => console.error("WebSocket error", err)
+    );
   };
 
-  // Mở modal tạo nhóm
-  const showCreateModal = () => {
-    fetchAllUsers();
-    setIsModalOpen(true);
+  const subscribeToRoom = (roomId) => {
+    if (!stompClientRef.current?.connected) return;
+
+    // Unsub topic cũ để tránh nhận tin nhắn đúp/sai phòng
+    if (subscriptionRef.current) subscriptionRef.current.unsubscribe();
+
+    subscriptionRef.current = stompClientRef.current.subscribe(`/topic/room/${roomId}`, (payload) => {
+      const newMessage = JSON.parse(payload.body);
+      setMessages((prev) => [...prev, newMessage]);
+    });
+  };
+
+  const disconnectWebSocket = () => {
+    if (stompClientRef.current) stompClientRef.current.disconnect();
   };
 
   return (
     <MainLayout>
       <div className="chat-container">
-        {/* --- CỘT TRÁI: DANH SÁCH PHÒNG --- */}
+        {/* === SIDEBAR === */}
         <div className="chat-sidebar">
           <div
+            className="sidebar-header"
             style={{
               padding: 15,
               borderBottom: "1px solid #eee",
@@ -174,119 +262,205 @@ export default function ChatPage() {
               alignItems: "center",
             }}
           >
-            <Text strong>Đoạn chat</Text>
-            <Button type="text" icon={<UsergroupAddOutlined />} onClick={showCreateModal} />
+            <Text strong style={{ fontSize: 16 }}>
+              Đoạn chat
+            </Text>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Badge count={requestCount} size="small" offset={[-2, 5]}>
+                <Button type="text" icon={<BellOutlined />} onClick={() => setIsRequestsOpen(true)} />
+              </Badge>
+              <Button
+                type="text"
+                icon={<UserAddOutlined />}
+                onClick={() => setIsAddFriendOpen(true)}
+                title="Thêm bạn bằng Email"
+              />
+              <Button
+                type="text"
+                icon={<UsergroupAddOutlined />}
+                onClick={() => {
+                  fetchFriends();
+                  setIsModalOpen(true);
+                }}
+                title="Tạo nhóm chat mới"
+              />
+            </div>
           </div>
 
           <div style={{ overflowY: "auto", flex: 1 }}>
-            {rooms.map((room) => (
-              <div
-                key={room.id}
-                className={`room-item ${selectedRoom?.id === room.id ? "active" : ""}`}
-                onClick={() => setSelectedRoom(room)}
-              >
-                <Avatar style={{ backgroundColor: room.group ? "#87d068" : "#1890ff" }}>
-                  {room.name ? room.name.charAt(0).toUpperCase() : "U"}
-                </Avatar>
-                <div style={{ overflow: "hidden" }}>
-                  <div style={{ fontWeight: 600 }}>{room.name}</div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "#888",
-                      whiteSpace: "nowrap",
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                    }}
+            {/* DANH SÁCH PHÒNG CHAT */}
+            {rooms.length > 0 ? (
+              rooms.map((room) => (
+                <div
+                  key={room.id}
+                  className={`room-item ${selectedRoom?.id === room.id ? "active" : ""}`}
+                  onClick={() => setSelectedRoom(room)}
+                >
+                  <Avatar
+                    src={getDisplayAvatar(room)}
+                    style={{ backgroundColor: room.isGroup ? "#87d068" : "#1890ff" }}
                   >
-                    {room.group ? "Nhóm chat" : "Tin nhắn riêng"}
+                    {/* Nếu không có avatar thì hiện chữ cái đầu */}
+                    {getDisplayName(room)?.charAt(0)?.toUpperCase()}
+                  </Avatar>
+
+                  <div style={{ overflow: "hidden", marginLeft: 12, flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{getDisplayName(room)}</div>
+                    <div style={{ fontSize: 12, color: "#888" }}>{room.isGroup ? "Nhóm chat" : "Tin nhắn riêng"}</div>
                   </div>
+                </div>
+              ))
+            ) : (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="Chưa có tin nhắn nào"
+                style={{ marginTop: 20 }}
+              />
+            )}
+
+            {/* DANH SÁCH BẠN BÈ (ĐỂ CHAT NHANH) */}
+            <div style={{ padding: "15px 15px 8px", borderTop: "1px solid #f0f0f0", marginTop: 10 }}>
+              <Text type="secondary" style={{ fontSize: 12, fontWeight: "bold" }}>
+                BẠN BÈ TRỰC TUYẾN ({friends.length})
+              </Text>
+            </div>
+            {friends.map((friend) => (
+              <div key={friend.userId} className="room-item friend-item" onClick={() => handleSelectFriend(friend)}>
+                <Badge dot status="success" offset={[-5, 30]}>
+                  <Avatar src={friend.avatar}>{friend.username?.charAt(0)}</Avatar>
+                </Badge>
+                <div style={{ marginLeft: 12 }}>
+                  <div style={{ fontWeight: 500 }}>{friend.username}</div>
+                  <div style={{ fontSize: 11, color: "#52c41a" }}>Nhấn để chat</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* --- CỘT PHẢI: CỬA SỔ CHAT --- */}
+        {/* === CHAT WINDOW === */}
         <div className="chat-window">
           {selectedRoom ? (
             <>
-              {/* Header */}
               <div className="chat-header">
-                <span>{selectedRoom.name}</span>
-                <Button size="small">Info</Button>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Avatar
+                    src={getDisplayAvatar(selectedRoom)}
+                    style={{ backgroundColor: selectedRoom.isGroup ? "#87d068" : "#1890ff" }}
+                  >
+                    {getDisplayName(selectedRoom)?.charAt(0)?.toUpperCase()}
+                  </Avatar>
+                  <div>
+                    <Text strong style={{ fontSize: 16 }}>
+                      {getDisplayName(selectedRoom)}
+                    </Text>
+                    <div style={{ fontSize: 12, color: "gray" }}>
+                      {selectedRoom.isGroup ? `${selectedRoom.participants?.length || 0} thành viên` : "Đang hoạt động"}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* List Tin nhắn */}
               <div className="message-list">
-                {messages.map((msg, index) => {
-                  const isMe = msg.senderId === user.username; // So sánh username
-                  return (
-                    <div key={index} style={{ display: "flex", flexDirection: "column" }}>
-                      <div className={`message-bubble ${isMe ? "me" : "other"}`}>
-                        {!isMe && <span className="sender-name">{msg.senderId}</span>}
-                        {msg.content}
+                {loadingMessages ? (
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
+                    <Spin />
+                  </div>
+                ) : (
+                  messages.map((msg, index) => {
+                    const isMe = String(msg.senderId) === String(user.userId);
+
+                    return (
+                      <div key={index} className={`message-wrapper ${isMe ? "me" : "other"}`}>
+                        {!isMe && (
+                          <Avatar src={msg.senderAvatar} size="small" style={{ marginRight: 8, marginTop: 4 }}>
+                            {msg.senderName?.charAt(0)?.toUpperCase()}
+                          </Avatar>
+                        )}
+
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: isMe ? "flex-end" : "flex-start",
+                          }}
+                        >
+                          {!isMe && (
+                            <div style={{ fontSize: 11, marginBottom: 2, marginLeft: 2, color: "#888" }}>
+                              {msg.senderName || "Người lạ"}
+                            </div>
+                          )}
+
+                          <div className="message-bubble" title={msg.timestamp}>
+                            {msg.content}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input */}
               <div className="chat-input-area">
                 <Input
+                  size="large"
                   placeholder="Nhập tin nhắn..."
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onPressEnter={sendMessage}
+                  style={{ borderRadius: 20 }}
                 />
-                <Button type="primary" icon={<SendOutlined />} onClick={sendMessage} />
+                <Button
+                  type="primary"
+                  shape="circle"
+                  icon={<SendOutlined />}
+                  size="large"
+                  onClick={sendMessage}
+                  style={{ marginLeft: 10 }}
+                />
               </div>
             </>
           ) : (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                height: "100%",
-                flexDirection: "column",
-              }}
-            >
-              <Empty description="Chọn một đoạn chat để bắt đầu" />
+            <div className="chat-empty-state">
+              <Empty description="Chọn một đoạn chat hoặc bạn bè để bắt đầu" />
             </div>
           )}
         </div>
       </div>
 
-      {/* --- MODAL TẠO NHÓM --- */}
+      {/* --- MODALS --- */}
+      <AddFriendModal isOpen={isAddFriendOpen} onCancel={() => setIsAddFriendOpen(false)} />
+
+      <FriendRequestsModal
+        isOpen={isRequestsOpen}
+        onCancel={() => setIsRequestsOpen(false)}
+        onRefreshFriends={fetchFriends}
+      />
+
+      {/* Modal Tạo Nhóm */}
       <Modal title="Tạo cuộc trò chuyện mới" open={isModalOpen} onCancel={() => setIsModalOpen(false)} footer={null}>
         <Form form={form} onFinish={handleCreateRoom} layout="vertical">
-          <Form.Item
-            name="name"
-            label="Tên nhóm (Để trống nếu chat riêng)"
-            rules={[{ required: true, message: "Nhập tên nhóm!" }]}
-          >
-            <Input placeholder="Ví dụ: Team Building..." />
+          <Form.Item name="name" label="Tên nhóm (Không bắt buộc)" help="Chỉ hiển thị khi có trên 2 thành viên">
+            <Input placeholder="Ví dụ: Team Project A..." />
           </Form.Item>
 
           <Form.Item
             name="members"
-            label="Thêm thành viên"
-            rules={[{ required: true, message: "Chọn ít nhất 1 người!" }]}
+            label="Chọn thành viên"
+            rules={[{ required: true, message: "Vui lòng chọn ít nhất 1 người!" }]}
           >
-            <Select mode="multiple" placeholder="Chọn thành viên...">
-              {allUsers.map((u) => (
-                <Select.Option key={u.id} value={u.email}>
-                  {u.username} ({u.email})
+            <Select mode="multiple" placeholder="Tìm kiếm bạn bè..." optionFilterProp="children">
+              {friends.map((f) => (
+                <Select.Option key={f.userId} value={f.email}>
+                  {f.username} ({f.email})
                 </Select.Option>
               ))}
             </Select>
           </Form.Item>
 
-          <Button type="primary" htmlType="submit" block>
-            Tạo nhóm
+          <Button type="primary" htmlType="submit" block size="large">
+            Bắt đầu trò chuyện
           </Button>
         </Form>
       </Modal>

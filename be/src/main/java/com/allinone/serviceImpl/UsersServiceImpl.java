@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -87,7 +88,17 @@ public class UsersServiceImpl implements UsersService {
     }
 
     @Override
+    public List<UsersResponse> getAllUsersByName(String username) {
+        return usersMapper.toUsersResponseList(usersRepository.findByUsername(username));
+    }
+
+    @Override
     public Users findByEmail(String email) {
         return usersRepository.findByEmail(email).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    @Override
+    public Users findByUserId(UUID id) {
+        return usersRepository.findByUserId(id);
     }
 }

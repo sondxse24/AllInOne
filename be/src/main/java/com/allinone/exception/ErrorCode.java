@@ -26,6 +26,16 @@ public enum ErrorCode {
     USER_NOT_FOUND(2001, "User not found", HttpStatus.NOT_FOUND),
     USER_NOT_AUTHENTICATED(2003, "User not authenticated context", HttpStatus.UNAUTHORIZED),
 
+    // FRIENDSHIP ERRORS (3000 - 3999)
+    FRIEND_REQUEST_NOT_FOUND(3000, "Friend request not found", HttpStatus.NOT_FOUND),
+    ALREADY_FRIENDS(3001, "You are already friends with this user", HttpStatus.BAD_REQUEST),
+    FRIEND_REQUEST_PENDING(3002, "A friend request is already pending", HttpStatus.BAD_REQUEST),
+    CANNOT_ADD_SELF(3003, "You cannot add yourself as a friend", HttpStatus.BAD_REQUEST),
+    INVALID_FRIEND_STATUS(3004, "Invalid friend status provided", HttpStatus.BAD_REQUEST),
+
+    // CHAT ERRORS (4000 - 4999)
+    ROOM_ALREADY_EXISTS(4000, "Phòng chat giữa hai người đã tồn tại", HttpStatus.CONFLICT),
+
     //SYSTEM ERRORS (9999)
     UNCATEGORIZED_EXCEPTION(9999, "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR);
 

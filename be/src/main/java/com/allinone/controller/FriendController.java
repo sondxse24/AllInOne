@@ -5,6 +5,7 @@ import com.allinone.dto.request.friend.AddFriendRequest;
 import com.allinone.dto.request.friend.DeleteFriendRequest;
 import com.allinone.dto.request.friend.ResponseAddFriendRequest;
 import com.allinone.dto.response.friend.FriendResponse;
+import com.allinone.dto.response.users.UsersResponse;
 import com.allinone.service.FriendService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,8 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/friend")
@@ -31,6 +34,16 @@ public class FriendController {
                         .code(200)
                         .message("Add friend successfully")
                         .result(null)
+                        .build()
+        );
+    }
+
+    @GetMapping("/requests")
+    public ResponseEntity<ApiResponse<List<FriendResponse>>> getFriendRequests() {
+        return ResponseEntity.ok(
+                ApiResponse.<List<FriendResponse>>builder()
+                        .code(200)
+                        .result(friendService.getAddFriendList())
                         .build()
         );
     }
@@ -57,6 +70,17 @@ public class FriendController {
                         .code(200)
                         .message("Delete friend successfully")
                         .result(null)
+                        .build()
+        );
+    }
+
+    @GetMapping("/list")
+    public ResponseEntity<ApiResponse<?>> getFriends() {
+        return ResponseEntity.ok(
+                ApiResponse.<List<UsersResponse>>builder()
+                        .code(200)
+                        .message("Delete friend successfully")
+                        .result(friendService.getListFriend())
                         .build()
         );
     }

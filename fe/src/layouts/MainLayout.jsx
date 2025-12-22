@@ -18,10 +18,10 @@ const { Header, Sider, Content } = Layout;
 const MainLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout } = useAuth();
-  
+
   // Mặc định loading là false vì AuthContext đã lo việc này
   // Nếu muốn kỹ thì lấy loading từ AuthContext
-  const { loading } = useAuth(); 
+  const { loading } = useAuth();
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,23 +56,22 @@ const MainLayout = ({ children }) => {
 
   return (
     // 1. Thêm hasSider để báo cho Antd biết đây là layout ngang
-    <Layout style={{ minHeight: "100vh" }} hasSider> 
-      
+    <Layout style={{ minHeight: "100vh" }} hasSider>
       {/* 2. Sider cố định bên trái */}
-      <Sider 
-        trigger={null} 
-        collapsible 
-        collapsed={collapsed} 
-        className="custom-sider" 
+      <Sider
+        trigger={null}
+        collapsible
+        collapsed={collapsed}
+        className="custom-sider"
         width={240}
         style={{
-          overflow: 'auto',
-          height: '100vh',
-          position: 'fixed',
+          overflow: "auto",
+          height: "100vh",
+          position: "fixed",
           left: 0,
           top: 0,
           bottom: 0,
-          zIndex: 100 // Đè lên mọi thứ khác
+          zIndex: 100, // Đè lên mọi thứ khác
         }}
       >
         <div className="logo-container">
@@ -97,11 +96,11 @@ const MainLayout = ({ children }) => {
       </Sider>
 
       {/* 3. Layout con nằm bên phải, margin-left bằng width của Sider */}
-      <Layout 
-        style={{ 
-            marginLeft: collapsed ? 80 : 240, // Tự động co giãn theo Sider
-            transition: 'all 0.2s', // Hiệu ứng mượt mà khi co giãn
-            minHeight: '100vh'
+      <Layout
+        style={{
+          marginLeft: collapsed ? 80 : 240, // Tự động co giãn theo Sider
+          transition: "all 0.2s", // Hiệu ứng mượt mà khi co giãn
+          minHeight: "100vh",
         }}
       >
         <Header
@@ -112,10 +111,10 @@ const MainLayout = ({ children }) => {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            position: 'sticky', // Dính header lên trên cùng khi cuộn
+            position: "sticky", // Dính header lên trên cùng khi cuộn
             top: 0,
             zIndex: 99,
-            width: '100%'
+            width: "100%",
           }}
         >
           <Button
@@ -162,7 +161,7 @@ const MainLayout = ({ children }) => {
             background: colorBgContainer,
             borderRadius: borderRadiusLG,
             boxShadow: "0 0 10px rgba(0,0,0,0.05)",
-            overflow: 'initial' // Để nội dung dài vẫn hiện đẹp
+            overflow: "initial", // Để nội dung dài vẫn hiện đẹp
           }}
         >
           {children}

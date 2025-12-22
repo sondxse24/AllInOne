@@ -5,6 +5,7 @@ import com.allinone.dto.response.users.UsersResponse;
 import com.allinone.entity.iam.Users;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface UsersService {
 
@@ -16,5 +17,9 @@ public interface UsersService {
 
     List<UsersResponse> getAllUsers();
 
+    List<UsersResponse> getAllUsersByName(String username);
+
     Users findByEmail(String name);
+
+    Users findByUserId(UUID id);
 }

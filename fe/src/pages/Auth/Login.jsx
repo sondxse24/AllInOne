@@ -10,6 +10,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
+import { useAuth } from "../../context/AuthContext";
 import { login, register } from "../../services/auth";
 
 import "./AuthPage.css";
@@ -17,6 +18,7 @@ import "./AuthPage.css";
 const { Title, Text } = Typography;
 
 const AuthPage = () => {
+  const { fetchUser } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -25,7 +27,7 @@ const AuthPage = () => {
     setLoading(true);
     try {
       const response = await login(values.email, values.password);
-
+      await fetchUser();
       message.success("Đăng nhập thành công!");
       navigate("/dashboard");
     } catch (err) {
@@ -56,7 +58,7 @@ const AuthPage = () => {
     if (currentPath !== "/login" && currentPath !== "/register") {
       localStorage.setItem("redirectAfterLogin", currentPath);
     }
-    
+
     const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
 
