@@ -57,4 +57,7 @@ public class Users {
     @LastModifiedDate
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean isOnline;
 }
