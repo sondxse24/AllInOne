@@ -1,6 +1,6 @@
 package com.allinone.security;
 
-import com.allinone.repository.UsersRepository;
+import com.allinone.repository.iam.UsersRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;

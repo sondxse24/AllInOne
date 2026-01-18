@@ -1,12 +1,16 @@
 package com.allinone.service;
 
 import com.allinone.dto.request.auth.LoginRequest;
-import com.allinone.dto.request.auth.RefreshTokenRequest;
 import com.allinone.dto.response.auth.LoginResponse;
-import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.servlet.http.HttpServletRequest;
 
 public interface AuthService {
 
     LoginResponse login(LoginRequest loginRequest);
-    LoginResponse refresh(RefreshTokenRequest refreshRequest);
+
+    LoginResponse refresh(HttpServletRequest refreshRequest);
+
+    void logout(HttpServletRequest request);
+
+    LoginResponse loginWithGoogle(String email, String name, String avatar);
 }

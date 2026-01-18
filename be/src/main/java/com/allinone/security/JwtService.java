@@ -1,7 +1,9 @@
 package com.allinone.security;
 
+import com.allinone.properties.JwtProperties;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.experimental.FieldDefaults;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -12,25 +14,21 @@ import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class JwtService {
 
-    private final JwtEncoder jwtEncoder;
-
-    @Value("${jwt.access-expiration}")
-    private long accessExpiration;
-
-    @Value("${jwt.refresh-expiration}")
-    private long refreshExpiration;
+    JwtEncoder jwtEncoder;
+    JwtProperties jwtProperties;
 
     public String generateAccessToken(UserDetails user) {
-        return generateToken(user, accessExpiration, "access");
+        return generateToken(user, jwtProperties.getAccessExpiration(), "access");
     }
 
     public String generateRefreshToken(UserDetails user) {
-        return generateToken(user, refreshExpiration, "refresh");
+        return generateToken(user, jwtProperties.getRefreshExpiration(), "refresh");
     }
 
-    private String generateToken(
+    String generateToken(
             UserDetails user,
             long expirationSeconds,
             String type

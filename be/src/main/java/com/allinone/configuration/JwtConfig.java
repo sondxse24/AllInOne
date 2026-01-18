@@ -1,25 +1,31 @@
 package com.allinone.configuration;
 
+import com.allinone.properties.JwtProperties;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
-import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
 
-@Component
+@Configuration
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class JwtConfig {
 
-    @Value("${jwt.secret-key}")
-    private String secretKey;
+    JwtProperties jwtProperties;
 
     @Bean
     public JwtEncoder jwtEncoder() {
-        byte[] keyBytes = Base64.getDecoder().decode(secretKey);
+        byte[] keyBytes = Base64.getDecoder()
+                .decode(jwtProperties.getSecretKey());
+
         return new NimbusJwtEncoder(
                 new ImmutableSecret<>(keyBytes)
         );
@@ -27,7 +33,9 @@ public class JwtConfig {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        byte[] keyBytes = Base64.getDecoder().decode(secretKey);
+        byte[] keyBytes = Base64.getDecoder()
+                .decode(jwtProperties.getSecretKey());
+
         SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
 
         return NimbusJwtDecoder
