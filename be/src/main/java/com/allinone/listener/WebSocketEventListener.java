@@ -30,7 +30,6 @@ public class WebSocketEventListener {
         String username = Objects.requireNonNull(headerAccessor.getUser()).getName();
 
         if (username != null) {
-            log.info("User Connected: " + username);
             updateUserStatus(username, true);
         }
     }
@@ -43,23 +42,27 @@ public class WebSocketEventListener {
         if (headerAccessor.getUser() != null) {
             String username = headerAccessor.getUser().getName();
             if (username != null) {
-                log.info("User Disconnected: " + username);
+                log.info("User Disconnected: {}", username);
                 updateUserStatus(username, false);
             }
         }
     }
 
-    // Hàm cập nhật DB và bắn socket ra toàn server
-    private void updateUserStatus(String username, boolean isOnline) {
-        var users = usersRepository.findByUsername(username); // Hoặc findByEmail tùy auth của bạn
-        if (!users.isEmpty()) {
-            Users user = users.getFirst();
+    private void updateUserStatus(String identity, boolean isOnline) {
+        // Log xem cái identity đang là Email hay Username
+        log.info("\uD83D\uDD0D Đang tìm User trong DB với key: {}", identity);
 
-            user.setOnline(isOnline);
-            usersRepository.save(user);
+        Users user = usersRepository.findByEmail(identity).orElse(null);
 
-            UserStatusResponse statusDto = new UserStatusResponse(user.getUserId().toString(), isOnline);
-            messagingTemplate.convertAndSend("/topic/public.status", statusDto);
-        }
+        // Update DB
+        assert user != null;
+        user.setOnline(isOnline);
+        usersRepository.save(user);
+        log.info("✅ Đã update DB isOnline={} cho user: {}", isOnline, user.getUsername());
+
+        // Bắn Socket
+        UserStatusResponse statusDto = new UserStatusResponse(user.getUserId().toString(), isOnline);
+        messagingTemplate.convertAndSend("/topic/public.status", statusDto);
+        log.info("🚀 Đã bắn tin nhắn tới /topic/public.status");
     }
 }

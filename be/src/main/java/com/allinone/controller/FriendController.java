@@ -4,8 +4,8 @@ import com.allinone.dto.base.ApiResponse;
 import com.allinone.dto.request.friend.AddFriendRequest;
 import com.allinone.dto.request.friend.DeleteFriendRequest;
 import com.allinone.dto.request.friend.ResponseAddFriendRequest;
+import com.allinone.dto.response.friend.FriendListResponse;
 import com.allinone.dto.response.friend.FriendResponse;
-import com.allinone.dto.response.users.UsersResponse;
 import com.allinone.service.FriendService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -77,7 +77,7 @@ public class FriendController {
     @GetMapping("/list")
     public ResponseEntity<ApiResponse<?>> getFriends() {
         return ResponseEntity.ok(
-                ApiResponse.<List<UsersResponse>>builder()
+                ApiResponse.<List<FriendListResponse>>builder()
                         .code(200)
                         .message("Delete friend successfully")
                         .result(friendService.getListFriend())

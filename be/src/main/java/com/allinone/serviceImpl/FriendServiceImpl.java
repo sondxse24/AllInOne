@@ -4,6 +4,7 @@ import com.allinone.constrant.FriendStatus;
 import com.allinone.dto.request.friend.AddFriendRequest;
 import com.allinone.dto.request.friend.DeleteFriendRequest;
 import com.allinone.dto.request.friend.ResponseAddFriendRequest;
+import com.allinone.dto.response.friend.FriendListResponse;
 import com.allinone.dto.response.friend.FriendResponse;
 import com.allinone.dto.response.users.UsersResponse;
 import com.allinone.entity.iam.Friendship;
@@ -110,9 +111,8 @@ public class FriendServiceImpl implements FriendService {
     }
 
     @Override
-    public List<UsersResponse> getListFriend() {
+    public List<FriendListResponse> getListFriend() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        assert authentication != null;
         Users user = usersService.findByEmail(authentication.getName());
         String myId = user.getUserId().toString();
 
@@ -120,8 +120,10 @@ public class FriendServiceImpl implements FriendService {
 
         return friendships.stream().map(f -> {
             String friendId = f.getRequesterId().equals(myId) ? f.getAddresseeId() : f.getRequesterId();
+
             Users friend = usersService.findByUserId(UUID.fromString(friendId));
-            return usersMapper.toUsersResponse(friend);
+            return usersMapper.toFriendListResponse(friend);
+
         }).collect(Collectors.toList());
     }
 }
